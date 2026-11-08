@@ -1,49 +1,70 @@
 # cuida
 
-**Every health record, answered out loud.** A voice agent for seniors that indexes their health records and answers any question about them in under 2 seconds, in English or Spanish. When something needs doing (a refill, a heads-up to family), it does it.
+**Every health record, answered out loud.** cuida centralizes a senior's health records (pharmacy list, lab reports, visit summaries, appointment letters, insurance) into one knowledge base, and an ElevenLabs voice agent answers any question about them in about 2 seconds, in English or Spanish. The agent does not just read: it writes back to the platform (doses taken, home readings, questions for the doctor, refills, texts to family).
 
-- **Track:** 03 · Health and Care (all patient data is fake)
-- **User:** Rosa Delgado, 78, bilingual, 4 conditions, 6 medications, lives 30 minutes from her daughter Ana
-- **Finish line:** Rosa gets a correct, sourced answer about her own care without calling her daughter. When action is needed, cuida sends the refill request to the pharmacy and texts Ana.
+- **Track:** 03 · Health and Care (fictional patient, all data fake)
+- **User:** Rosa Delgado, 78, bilingual, 4 conditions, 6 medications, daughter Ana lives 30 minutes away
+- **Finish line:** Rosa gets a correct, sourced answer about her own care without calling Ana. When something needs doing, cuida does it in the platform (refill sent, question saved, reading logged) and texts Ana.
 
-## How it works
+## Architecture
 
 ```
-Rosa talks ──► ElevenLabs Agent (WebRTC, STT ► LLM ► TTS)
-                    │ client tool calls
-                    ▼
-   browser record index (32 chunks, EN/ES synonyms)  ── search_records, get_medication_schedule, get_appointments
-   Daytona sandbox (Python trend analysis)            ── analyze_lab_trend
-   Next.js server actions (+ optional Twilio SMS)     ── request_refill, notify_family
+Rosa (voice) ─► ElevenLabs Agent ──webhook tools (HTTPS + x-cuida-key)──► cuida platform API (Next.js)
+                                                                            │
+          records/*.pdf ── ingested at boot (unpdf) ──► passage index (BM25 + EN/ES expansion)
+          src/data/rosa.json ── normalized record (meds, appointments, labs)
+          in-memory state ── doses, home readings, doctor questions, refills, family texts
+          Daytona sandbox ── analyze_lab_trend runs as Python
+          GET /api/agent/feed ── every tool call + write, for the demo screen
 ```
 
-- `src/data/rosa.json`: the fake patient record (meds with pill descriptions, appointments, visit notes, labs, allergies, care team, insurance).
-- `src/lib/records.ts`: chunks the record and builds a weighted keyword index with plain-language and Spanish synonyms ("the pink pill", "la pastilla rosa", "my heart doctor"). Searches run in under 1 ms.
-- `agent/system-prompt.md` + `agent/tools.json`: the agent definition. Tools are ElevenLabs **client tools**, so the UI can show each record as the agent finds it.
-- `src/app/api/analyze`: runs the lab trend analysis as Python inside a **Daytona** sandbox (pre-warmed on page load).
-- `src/app/api/token`: mints a private WebRTC conversation token so the API key never reaches the browser.
-- `src/app/api/actions`: refill requests and family messages. Sends a real SMS to `FAMILY_PHONE` if Twilio is configured.
-- The stage shows **reply time** per turn (end of Rosa's turn to cuida's first audio), so the 2-second claim is measured, not asserted.
+### The 11 agent tools (`agent/tools.json`)
+| Tool | Endpoint | Reads / writes |
+|---|---|---|
+| get_daily_briefing | GET /api/agent/briefing | today's meds + what's taken, appointments in 10 days, refill alerts |
+| search_records | GET /api/agent/search?q= | excerpts from the uploaded PDFs, with document + date |
+| read_document | GET /api/agent/documents?id= | full text of one document |
+| get_medications | GET /api/agent/medications | dose, pill look, purpose, refills, runs-out date, taken today |
+| log_dose | POST /api/agent/doses | **writes** dose taken |
+| get_appointments | GET /api/agent/appointments | upcoming with prep + saved questions, or past visits |
+| add_question_for_doctor | POST /api/agent/appointments/questions | **writes** a question to an appointment |
+| analyze_lab_trend | POST /api/agent/labs | trend math in a **Daytona** sandbox |
+| log_home_reading | POST /api/agent/vitals | **writes** BP / sugar / weight / HR, returns flag + guidance |
+| request_refill | POST /api/agent/refills | **writes** refill request (pharmacy + prescriber if 0 refills) |
+| notify_family | POST /api/agent/family | **writes** text to Ana (real SMS if Twilio is set) |
 
-## Setup (about 5 minutes)
+### Mock records (`records/`)
+Nine realistic PDFs generated from `src/data/rosa.json` by `npm run records`: health summary, pharmacy medication list, lab report, three after-visit summaries, eye exam, appointment letters, insurance benefits. Edit the JSON and regenerate to change the story.
+
+## Run it (about 5 minutes)
 
 ```bash
 npm install
-cp .env.example .env.local      # add ELEVENLABS_API_KEY and DAYTONA_API_KEY
-npm run setup:agent             # creates the 6 tools + the agent, writes the agent id to .env.local
-npm run dev                     # http://localhost:3000
+cp .env.example .env.local     # add ELEVENLABS_API_KEY (and DAYTONA_API_KEY)
+
+# terminal 1
+npm run dev
+
+# terminal 2: public HTTPS URL so ElevenLabs can reach your laptop
+npm run tunnel                 # copy the https://xxxx.trycloudflare.com URL
+
+# terminal 3: create (first run) or sync (every later run) the agent + tools
+PUBLIC_URL=https://xxxx.trycloudflare.com npm run sync:agent
+# first run generates CUIDA_AGENT_KEY: restart terminal 1 (npm run dev) once
 ```
 
-Then in the ElevenLabs dashboard, open the **cuida** agent:
-1. **Agent tab > Additional languages:** add Spanish (lets Rosa switch mid-call).
-2. **Voice:** pick a warm, slower voice. **LLM:** pick the fastest available (a Flash or mini model) for sub-2s replies.
-3. **Advanced:** turn eagerness to "eager" if replies feel slow to start.
+The script ends with a reachability check and a link to the agent. Open it, click **Test AI agent**, and run through `agent/TEST-QUESTIONS.md`.
 
-If `setup:agent` fails, create the agent by hand: paste `agent/system-prompt.md` as the system prompt, set the first message, and add each tool in `agent/tools.json` as a **Client** tool with **Wait for response** on and the same name and parameters.
+**Re-run `npm run sync:agent` whenever** the tunnel URL changes (it changes every time `npm run tunnel` restarts), or after editing `agent/system-prompt.md` or `agent/tools.json`. It updates the same agent and tools in place.
 
-Test tools without voice from the browser console: `__cuida.search_records({ query: "pink pill" })`.
+### In the ElevenLabs dashboard (one time)
+1. Agent tab, **Additional languages:** add Spanish.
+2. **Voice:** a warm, slightly slower voice. **LLM:** the fastest one listed (Flash / mini).
+3. **Advanced:** turn eagerness "eager" if replies start slowly.
 
-## Demo tips
-- Record in Chrome at 1440x900 or larger, zoom 100%, full screen.
-- Use headphones so cuida does not hear itself and interrupt.
-- Click **reset demo** (top right of the middle panel) between takes.
+### Watching the agent touch the data
+`curl localhost:3000/api/agent/feed` shows every tool call (with ms), and every dose, reading, question, refill and text the agent wrote. `curl -X DELETE localhost:3000/api/agent/feed` resets the demo.
+
+## Status
+- Done: mock records, ingestion + search, 11 read/write endpoints, agent prompt + tools, sync script.
+- On hold: the phone-mockup demo screen (`src/components/Stage.tsx`) still uses the earlier client-tool version; it will be rewired to read `/api/agent/feed`.

@@ -1,86 +1,320 @@
 [
   {
-    "type": "client",
+    "type": "webhook",
+    "name": "get_daily_briefing",
+    "description": "Rosa's day at a glance: today's medications and which doses are already logged, appointments in the next 10 days with prep, refill alerts, and today's home readings. Call this at the start of every conversation and for 'what do I have today'.",
+    "response_timeout_secs": 10,
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/briefing",
+      "method": "GET",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      }
+    }
+  },
+  {
+    "type": "webhook",
     "name": "search_records",
-    "description": "Search Rosa's indexed health records (medications, pill descriptions, appointments, visit notes, lab results, allergies, care team, insurance, vaccines). Call this BEFORE answering any question about her health or care. Pass the question in plain English keywords, e.g. 'pink pill', 'advil knee pain', 'heart doctor appointment'.",
-    "expects_response": true,
+    "description": "Search the text of Rosa's uploaded health documents (pharmacy medication list, lab report, after-visit summaries, appointment letters, insurance benefits, health summary). Returns the best matching excerpts with the document name and date. Use for any question about what a document or doctor said.",
     "response_timeout_secs": 10,
-    "parameters": {
-      "type": "object",
-      "required": ["query"],
-      "properties": {
-        "query": { "type": "string", "description": "Short keyword query in English describing what to look up." }
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/search",
+      "method": "GET",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "query_params_schema": {
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Short keyword query in English, e.g. 'pink pill', 'advil eliquis', 'fasting blood test', 'specialist copay'."
+          }
+        },
+        "required": [
+          "q"
+        ]
       }
     }
   },
   {
-    "type": "client",
-    "name": "get_medication_schedule",
-    "description": "Get Rosa's medications for a time of day, with dose, what each pill looks like, and what it is for. Use for 'what do I take tonight', 'which pills in the morning'.",
-    "expects_response": true,
+    "type": "webhook",
+    "name": "read_document",
+    "description": "Read one full document from Rosa's records. Use when an excerpt is not enough, e.g. the whole lab report. Use 'list' to see all documents.",
     "response_timeout_secs": 10,
-    "parameters": {
-      "type": "object",
-      "required": ["time_of_day"],
-      "properties": {
-        "time_of_day": { "type": "string", "enum": ["morning", "evening", "bedtime", "as needed", "all"], "description": "Which part of the day." }
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/documents",
+      "method": "GET",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "query_params_schema": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Document id or a word from its title, e.g. 'lab', 'medication', 'insurance', 'chen', 'appointments'."
+          }
+        },
+        "required": [
+          "id"
+        ]
       }
     }
   },
   {
-    "type": "client",
+    "type": "webhook",
+    "name": "get_medications",
+    "description": "Rosa's medications with dose, what each pill looks like, what it is for, refills left, when it runs out, and which doses were taken today.",
+    "response_timeout_secs": 10,
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/medications",
+      "method": "GET",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "query_params_schema": {
+        "properties": {
+          "time_of_day": {
+            "type": "string",
+            "description": "Which part of the day.",
+            "enum": [
+              "morning",
+              "evening",
+              "bedtime",
+              "as needed",
+              "all"
+            ]
+          }
+        },
+        "required": [
+          "time_of_day"
+        ]
+      }
+    }
+  },
+  {
+    "type": "webhook",
+    "name": "log_dose",
+    "description": "Record that Rosa took her medication. Use when she says she took a pill or her morning/evening pills.",
+    "response_timeout_secs": 10,
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/doses",
+      "method": "POST",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "medication": {
+            "type": "string",
+            "description": "Medication name or description ('Eliquis', 'the pink pill'), or 'all' for every pill due at that time."
+          },
+          "time_of_day": {
+            "type": "string",
+            "description": "Which dose.",
+            "enum": [
+              "morning",
+              "evening",
+              "bedtime",
+              "as needed"
+            ]
+          }
+        },
+        "required": [
+          "medication",
+          "time_of_day"
+        ]
+      }
+    }
+  },
+  {
+    "type": "webhook",
     "name": "get_appointments",
-    "description": "List Rosa's appointments with date, time, address and how to prepare.",
-    "expects_response": true,
+    "description": "Rosa's appointments with date, time, address, how to prepare, and questions saved for the doctor. 'past' returns past visit summaries.",
     "response_timeout_secs": 10,
-    "parameters": {
-      "type": "object",
-      "required": ["range"],
-      "properties": {
-        "range": { "type": "string", "enum": ["next", "upcoming", "past"], "description": "'next' for only the next one." }
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/appointments",
+      "method": "GET",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "query_params_schema": {
+        "properties": {
+          "range": {
+            "type": "string",
+            "description": "Which appointments.",
+            "enum": [
+              "next",
+              "upcoming",
+              "past"
+            ]
+          }
+        },
+        "required": [
+          "range"
+        ]
       }
     }
   },
   {
-    "type": "client",
+    "type": "webhook",
+    "name": "add_question_for_doctor",
+    "description": "Save a question Rosa wants to ask at an upcoming appointment, so it is on her list when she gets there.",
+    "response_timeout_secs": 10,
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/appointments/questions",
+      "method": "POST",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "appointment": {
+            "type": "string",
+            "description": "Which appointment: 'next', a doctor name, or a type like 'heart doctor' or 'eye exam'."
+          },
+          "question": {
+            "type": "string",
+            "description": "The question in Rosa's words, in English."
+          }
+        },
+        "required": [
+          "appointment",
+          "question"
+        ]
+      }
+    }
+  },
+  {
+    "type": "webhook",
     "name": "analyze_lab_trend",
-    "description": "Run a trend analysis on one of Rosa's lab measurements over time (code runs in a secure Daytona sandbox). Returns first and latest values, change, direction, and whether it is at goal. Use for 'is my sugar getting better', 'how is my cholesterol'.",
-    "expects_response": true,
-    "response_timeout_secs": 20,
-    "parameters": {
-      "type": "object",
-      "required": ["test"],
-      "properties": {
-        "test": { "type": "string", "enum": ["a1c", "ldl", "blood_pressure", "egfr", "weight"], "description": "Which measurement. a1c = blood sugar average." }
+    "description": "Analyze how one of Rosa's lab values has changed over time (runs in a secure Daytona sandbox). Returns first and latest values, change, direction and whether it is at goal.",
+    "response_timeout_secs": 30,
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/labs",
+      "method": "POST",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "test": {
+            "type": "string",
+            "description": "Which measurement. a1c = average blood sugar.",
+            "enum": [
+              "a1c",
+              "ldl",
+              "blood_pressure",
+              "egfr",
+              "weight"
+            ]
+          }
+        },
+        "required": [
+          "test"
+        ]
       }
     }
   },
   {
-    "type": "client",
+    "type": "webhook",
+    "name": "log_home_reading",
+    "description": "Save a reading Rosa took at home (blood pressure, blood sugar, weight, heart rate). Returns whether it is in range and what her care plan says to do.",
+    "response_timeout_secs": 10,
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/vitals",
+      "method": "POST",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Kind of reading.",
+            "enum": [
+              "blood_pressure",
+              "blood_sugar",
+              "weight",
+              "heart_rate"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "description": "The value as she said it, e.g. '142/88', '118', '157'."
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional context, e.g. 'after breakfast', 'feeling dizzy'."
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      }
+    }
+  },
+  {
+    "type": "webhook",
     "name": "request_refill",
-    "description": "Send a refill request for one of Rosa's prescriptions to Harbor Pharmacy and the prescribing doctor. Only call after Rosa says yes.",
-    "expects_response": true,
+    "description": "Send a refill request for one of Rosa's prescriptions to Harbor Pharmacy (and to the prescribing doctor if no refills are left). Only call after Rosa says yes.",
     "response_timeout_secs": 10,
-    "parameters": {
-      "type": "object",
-      "required": ["medication"],
-      "properties": {
-        "medication": { "type": "string", "description": "Medication name, e.g. 'Eliquis' or 'metformin'." }
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/refills",
+      "method": "POST",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "medication": {
+            "type": "string",
+            "description": "Medication name or description, e.g. 'Eliquis' or 'the pink pill'."
+          }
+        },
+        "required": [
+          "medication"
+        ]
       }
     }
   },
   {
-    "type": "client",
+    "type": "webhook",
     "name": "notify_family",
-    "description": "Send a text message to Rosa's daughter Ana to keep her in the loop. Use after an action (refill, appointment prep), when Rosa asks, when a question needs a human or a doctor, or with urgency 'urgent' for any emergency.",
-    "expects_response": true,
+    "description": "Text Rosa's daughter Ana. Use after an action (refill, saved question, worrying reading), when Rosa asks, or with urgency 'urgent' in any emergency.",
     "response_timeout_secs": 10,
-    "parameters": {
-      "type": "object",
-      "required": ["message", "urgency"],
-      "properties": {
-        "message": { "type": "string", "description": "Short message to Ana in English, written by cuida about her mom." },
-        "urgency": { "type": "string", "enum": ["fyi", "soon", "urgent"], "description": "How fast Ana should look at it." }
+    "api_schema": {
+      "url": "{{BASE_URL}}/api/agent/family",
+      "method": "POST",
+      "request_headers": {
+        "x-cuida-key": "{{AGENT_KEY}}"
+      },
+      "request_body_schema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Short message to Ana in English, written by cuida about her mom."
+          },
+          "urgency": {
+            "type": "string",
+            "description": "How fast Ana should look.",
+            "enum": [
+              "fyi",
+              "soon",
+              "urgent"
+            ]
+          }
+        },
+        "required": [
+          "message",
+          "urgency"
+        ]
       }
     }
   }
