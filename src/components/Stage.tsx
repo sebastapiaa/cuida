@@ -180,7 +180,8 @@ export default function Stage() {
 
   return (
     <div className="h-screen w-screen bg-white flex flex-col">
-      <div className="px-8 pt-6">
+      <div className="px-8 pt-6 flex items-center gap-2.5">
+        <Logo size={30} />
         <span className="text-[26px] font-semibold tracking-[-0.03em] text-navy">cuida.</span>
       </div>
       <div className="flex-1 grid place-items-center pb-6 -mt-6">
@@ -192,50 +193,64 @@ export default function Stage() {
             {/* ---------------- content ---------------- */}
             <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-5 pt-3 pb-4">
               {tab === "talk" && (
-                <div className="flex flex-col min-h-full">
-                  <p className="eyebrow">{today().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-                  <h2 className="text-[32px] font-semibold leading-[1.05] tracking-[-0.03em] mt-1">{greeting},<br />Rosa</h2>
-
-                  <div className="flex flex-col items-center mt-7">
-                    <button onClick={connected ? () => conversation.endSession() : start} className="orb-btn" aria-label={connected ? "End" : "Talk to cuida"}>
-                      <div ref={orbRef} className={`orb ${connected ? (isSpeaking ? "orb-speaking" : "orb-listening") : ""}`}>
-                        {!connected && <MicIcon width={44} height={44} strokeWidth={1.6} />}
-                      </div>
-                    </button>
-                    <p className="mt-6 text-[15px] font-medium text-ink-2">
-                      {status === "connecting" ? "Connecting…" : !connected ? "Tap to talk" : isSpeaking ? "cuida is speaking" : "Listening…"}
-                    </p>
+                <div className="flex flex-col min-h-full talk-bg -mx-5 -mt-3 px-5 pt-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Logo size={30} />
+                      <span className="text-[19px] font-semibold tracking-[-0.03em]">cuida.</span>
+                    </div>
+                    <span className="text-[12px] font-medium text-ink-3">{today().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
                   </div>
+                  <h2 className="text-[30px] font-semibold leading-[1.05] tracking-[-0.03em] mt-5">{greeting},<br />Rosa</h2>
+                  <p className="text-[14px] text-ink-2 mt-1.5">Ask about your pills, visits or results.</p>
 
-                  <div className="mt-5 space-y-3">
-                    {lastUser && <p className="text-[14px] text-ink-3 italic">“{lastUser.text}”</p>}
-                    {lastAgent && <p key={lastAgent.id} className="caption fade-in">{lastAgent.text}</p>}
-                    {latest && connected && (
-                      <p className="text-[12px] text-ink-3 flex items-center gap-1.5 fade-in" key={latest.id}>
-                        <CheckIcon width={12} height={12} strokeWidth={2.6} className="text-green" />
-                        {TOOL_LABEL[latest.tool ?? ""] ?? latest.tool} · {latest.ms} ms
+                  <div className="flex-1 grid place-items-center py-6">
+                    <div className="flex flex-col items-center">
+                      <button onClick={connected ? () => conversation.endSession() : start} className="orb-btn" aria-label={connected ? "End" : "Talk to cuida"}>
+                        <div ref={orbRef} className={`orb ${connected ? (isSpeaking ? "orb-speaking" : "orb-listening") : ""}`}>
+                          <span className="orb-ring" />
+                          <span className="orb-ring orb-ring-2" />
+                          {!connected ? <MicIcon width={48} height={48} strokeWidth={1.5} /> : <span className="orb-bars"><i /><i /><i /><i /></span>}
+                        </div>
+                      </button>
+                      <p className="mt-6 text-[15px] font-semibold">
+                        {status === "connecting" ? "Connecting…" : !connected ? "Tap to talk to cuida" : isSpeaking ? "cuida is speaking" : "Listening…"}
                       </p>
-                    )}
-                    {surfaced.length > 0 && (
-                      <div className="pt-1 space-y-2">
-                        <p className="eyebrow">From your records</p>
-                        {surfaced.map((c, i) => <RecordCard key={c.id + c.at} c={c} delay={i * 70} />)}
-                      </div>
-                    )}
+                      {connected && <button onClick={() => conversation.endSession()} className="mt-1.5 text-[12.5px] text-ink-3 hover:text-navy">End conversation</button>}
+                    </div>
                   </div>
+
+                  {(lastUser || lastAgent || surfaced.length > 0 || error) && (
+                    <div className="space-y-3 pb-2">
+                      {lastUser && <p className="text-[14px] text-ink-3 italic">“{lastUser.text}”</p>}
+                      {lastAgent && <p key={lastAgent.id} className="caption fade-in">{lastAgent.text}</p>}
+                      {latest && connected && (
+                        <p className="text-[12px] text-ink-3 flex items-center gap-1.5 fade-in" key={latest.id}>
+                          <CheckIcon width={12} height={12} strokeWidth={2.6} className="text-green" />
+                          {TOOL_LABEL[latest.tool ?? ""] ?? latest.tool} · {latest.ms} ms
+                        </p>
+                      )}
+                      {surfaced.length > 0 && (
+                        <div className="pt-1 space-y-2">
+                          <p className="eyebrow">From your records</p>
+                          {surfaced.map((c, i) => <RecordCard key={c.id + c.at} c={c} delay={i * 70} />)}
+                        </div>
+                      )}
+                      {error && <p className="text-[12.5px] text-[var(--red)] bg-[var(--red-soft)] rounded-xl px-3 py-2">{error}</p>}
+                    </div>
+                  )}
 
                   {connected && (
-                    <form onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { conversation.sendUserMessage(typed.trim()); setTyped(""); } }} className="mt-auto pt-4">
+                    <form onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { conversation.sendUserMessage(typed.trim()); setTyped(""); } }} className="pt-2 pb-1">
                       <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Type instead of talking…" className="type-box" />
                     </form>
                   )}
-                  {error && <p className="mt-3 text-[12.5px] text-[var(--red)] bg-[var(--red-soft)] rounded-xl px-3 py-2">{error}</p>}
                 </div>
               )}
 
               {tab === "pills" && (
                 <div>
-                  <Header title="Pills" sub="From your pharmacy list" />
+                  <Header title="Pills" sub="Rosa's pharmacy list" />
                   {(["morning", "evening", "bedtime", "as needed"] as const).map((slot) => {
                     const meds = record.medications.filter((m) => m.schedule.includes(slot));
                     if (!meds.length) return null;
@@ -279,7 +294,7 @@ export default function Stage() {
 
               {tab === "visits" && (
                 <div>
-                  <Header title="Visits" sub="Upcoming appointments" />
+                  <Header title="Visits" sub="Rosa's appointments" />
                   <div className="space-y-2 mt-3">
                     {record.appointments.filter((a) => a.date >= isoToday()).map((a, i) => {
                       const qs = data.questions[a.id] ?? [];
@@ -324,7 +339,7 @@ export default function Stage() {
 
               {tab === "health" && (
                 <div>
-                  <Header title="Health" sub="Lab results and home readings" />
+                  <Header title="Health" sub="Rosa's lab results and home readings" />
                   <div className="space-y-2 mt-3">
                     {(Object.keys(record.labs) as LabKey[]).map((key) => {
                       const lab = record.labs[key];
@@ -369,9 +384,9 @@ export default function Stage() {
 
               {tab === "ana" && (
                 <div>
-                  <Header title="Ana" sub="Your daughter · 30 minutes away" />
+                  <Header title="Ana" sub="Rosa's daughter · 30 minutes away" />
                   <div className="mt-3 space-y-2.5">
-                    {texts.length === 0 && <p className="text-[13px] text-ink-3">No texts today. Ana has not needed a call.</p>}
+                    {texts.length === 0 && <p className="text-[13px] text-ink-3">No texts today. Rosa has not needed to call Ana.</p>}
                     {[...texts].reverse().map((a) => {
                       const d = (a.detail ?? {}) as { urgency?: string; sms?: string };
                       return (
@@ -417,6 +432,17 @@ export default function Stage() {
 }
 
 /* ------------------------------------------------------------------ */
+export function Logo({ size = 28 }: { size?: number }) {
+  // navy rounded square, white "c", green period: the same mark as the wordmark "cuida."
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-label="cuida">
+      <rect width="48" height="48" rx="14" fill="var(--navy)" />
+      <path d="M30.5 18.6a9.2 9.2 0 1 0 0 10.8" fill="none" stroke="#fff" strokeWidth="4.2" strokeLinecap="round" />
+      <circle cx="34.5" cy="31.5" r="3.2" fill="var(--green)" />
+    </svg>
+  );
+}
+
 function Header({ title, sub }: { title: string; sub: string }) {
   return (
     <div>
