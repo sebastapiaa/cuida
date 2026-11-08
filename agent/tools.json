@@ -190,7 +190,7 @@
     "type": "webhook",
     "name": "analyze_lab_trend",
     "description": "Analyze how one of Rosa's lab values has changed over time (runs in a secure Daytona sandbox). Returns first and latest values, change, direction and whether it is at goal.",
-    "response_timeout_secs": 30,
+    "response_timeout_secs": 25,
     "api_schema": {
       "url": "{{BASE_URL}}/api/agent/labs",
       "method": "POST",

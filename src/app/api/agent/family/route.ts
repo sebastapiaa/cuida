@@ -15,6 +15,7 @@ async function sendSms(text: string) {
 }
 
 export const POST = agentRoute("notify_family", body, async ({ message, urgency = "fyi" }) => {
+  if (!message) return { summary: "missing message", data: { error: "Need the message text for Ana." } };
   const ana = record.patient.family.find((f) => f.primary)!;
   const sms = await sendSms(`cuida${urgency === "urgent" ? " URGENT" : ""} · Mom: ${message}`);
   emit({ kind: "family_message", summary: message, detail: { to: ana.name, urgency, sms } });

@@ -4,6 +4,8 @@ import { emit, findMed, record, state, todayISO } from "@/lib/platform";
 export const dynamic = "force-dynamic";
 
 export const POST = agentRoute("log_dose", body, async ({ medication, time_of_day }) => {
+  if (!medication) return { summary: "missing medication", data: { error: "Need a medication name or 'all'." } };
+  time_of_day = time_of_day || "morning";
   const s = state();
   const today = todayISO();
   const meds = /all|todas|everything/i.test(medication)

@@ -64,3 +64,36 @@ export async function analyzeTrend(lab: TrendLab) {
   if (res.exitCode !== 0) throw new Error(res.result);
   return { sandboxId: sb.id, result: JSON.parse(res.result.trim().split("\n").pop()!) };
 }
+
+/* ------------------------------------------------------------------ */
+/* Result cache: the lab series are fixed records, so each trend is    */
+/* computed in the sandbox once at boot (and refreshed after every     */
+/* request) and served instantly. Daytona still does the math.         */
+/* ------------------------------------------------------------------ */
+type Cached = { sandboxId: string; result: Record<string, unknown>; computedAt: string };
+const cache = (globalThis as unknown as { __cuidaTrends?: Map<string, Cached> }).__cuidaTrends ??= new Map<string, Cached>();
+(globalThis as unknown as { __cuidaTrends?: Map<string, Cached> }).__cuidaTrends = cache;
+
+export async function computeAndCache(key: string, lab: TrendLab) {
+  const { sandboxId, result } = await analyzeTrend(lab);
+  const entry = { sandboxId, result, computedAt: new Date().toISOString() };
+  cache.set(key, entry);
+  return entry;
+}
+
+export function cachedTrend(key: string) {
+  return cache.get(key);
+}
+
+// Fire and forget: refresh one entry in the background.
+export function refreshTrend(key: string, lab: TrendLab) {
+  computeAndCache(key, lab).catch((e) => console.log(`[labs] background refresh of ${key} failed: ${String(e).slice(0, 100)}`));
+}
+
+export async function warmTrends(labs: Record<string, TrendLab>) {
+  const t = Date.now();
+  const keys = Object.keys(labs);
+  const results = await Promise.allSettled(keys.map((k) => computeAndCache(k, labs[k])));
+  const ok = results.filter((r) => r.status === "fulfilled").length;
+  console.log(`[boot] daytona computed ${ok}/${keys.length} lab trends in ${Date.now() - t}ms`);
+}

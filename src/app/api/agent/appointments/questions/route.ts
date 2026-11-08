@@ -4,6 +4,7 @@ import { emit, findAppt, spoken, state } from "@/lib/platform";
 export const dynamic = "force-dynamic";
 
 export const POST = agentRoute("add_question_for_doctor", body, async ({ appointment, question }) => {
+  if (!question) return { summary: "missing question", data: { error: "Need the question text." } };
   const a = findAppt(appointment ?? "next");
   if (!a) return { summary: "no upcoming appointment", data: { error: "No upcoming appointment found." } };
   const qs = (state().questions[a.id] ??= []);

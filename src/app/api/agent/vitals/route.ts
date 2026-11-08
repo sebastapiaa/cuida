@@ -35,6 +35,8 @@ function assess(type: string, value: string): { flag: string; guidance: string }
 }
 
 export const POST = agentRoute("log_home_reading", body, async ({ type, value, note }) => {
+  if (!type || !value) return { summary: "missing type or value", data: { error: `Need both type (one of ${Object.keys(UNITS).join(", ")}) and value.` } };
+  value = String(value);
   const unit = UNITS[type] ?? "";
   const { flag, guidance } = assess(type, value);
   state().vitals.push({ type, value, unit, ts: Date.now(), note, flag });

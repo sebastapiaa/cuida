@@ -4,7 +4,7 @@ import { emit, findMed, record, state } from "@/lib/platform";
 export const dynamic = "force-dynamic";
 
 export const POST = agentRoute("request_refill", body, async ({ medication }) => {
-  const m = findMed(medication);
+  const m = medication ? findMed(medication) : undefined;
   if (!m || !m.lastFilled) return { summary: `cannot refill ${medication}`, data: { error: `${medication} is not a prescription on Rosa's list.` } };
   const s = state();
   if (s.refills.some((r) => r.medId === m.id)) return { summary: "already requested", data: { already_requested: true, medication: m.name } };

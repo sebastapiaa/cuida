@@ -8,7 +8,9 @@
     "start": "next start",
     "sync:agent": "node scripts/setup-agent.mjs",
     "tunnel": "npx -y cloudflared tunnel --url http://localhost:3000",
-    "records": "python3 scripts/make-records.py"
+    "records": "python3 scripts/make-records.py",
+    "up": "node scripts/up.mjs",
+    "agent:show": "node scripts/setup-agent.mjs --show"
   },
   "dependencies": {
     "@daytonaio/sdk": "^0.230.0",
