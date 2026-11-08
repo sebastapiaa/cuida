@@ -8,6 +8,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { extractText, getDocumentProxy } from "unpdf";
 import rosa from "@/data/rosa.json";
+import { loadPersisted, savePersisted } from "./store";
 
 export const record = rosa;
 export type Med = (typeof rosa.medications)[number];
@@ -153,6 +154,23 @@ export function resetState() {
   s.questions = {};
   s.refills = [];
   s.feed = [];
+}
+
+// Hosted (Vercel + Redis): pull the shared state into this instance before handling a request.
+export async function syncIn() {
+  const p = await loadPersisted();
+  if (!p) return;
+  const s = state();
+  s.doses = p.doses as State["doses"];
+  s.vitals = p.vitals as State["vitals"];
+  s.questions = p.questions;
+  s.refills = p.refills as State["refills"];
+  s.feed = p.feed as FeedEvent[];
+}
+// ...and push it back after handling one.
+export async function syncOut() {
+  const s = state();
+  await savePersisted({ doses: s.doses, vitals: s.vitals, questions: s.questions, refills: s.refills, feed: s.feed });
 }
 
 export function emit(e: Omit<FeedEvent, "id" | "ts">) {

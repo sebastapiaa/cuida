@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { emit, nowText, todayISO } from "@/lib/platform";
+import { emit, nowText, syncIn, syncOut, todayISO } from "@/lib/platform";
 
 // Wraps every agent-facing endpoint: shared-secret check, timing, stdout log, and a feed event
 // so the demo screen shows each tool call the ElevenLabs agent makes.
@@ -28,17 +28,20 @@ export function agentRoute<A>(
       args = {} as A;
     }
     if (args === null || typeof args !== "object") args = {} as A;
+    await syncIn();
     try {
       const { data, summary } = await run(args);
       const ms = Math.round(performance.now() - t);
       // Attach the result to the feed event when it is small, so the demo screen can show it.
       const detail = JSON.stringify(data).length < 8000 ? data : undefined;
       emit({ kind: "tool_call", tool, args, ms, summary, detail });
+      await syncOut();
       return done(200, { now: nowText(), today: todayISO(), ...(data as object) });
     } catch (e) {
       const ms = Math.round(performance.now() - t);
       const msg = e instanceof Error ? e.message : String(e);
       emit({ kind: "tool_call", tool, args, ms, summary: `error: ${msg}` });
+      await syncOut();
       return done(200, { now: nowText(), today: todayISO(), error: `Could not complete ${tool}: ${msg}. Tell Rosa you could not look that up right now and offer to try again.` });
     }
   };

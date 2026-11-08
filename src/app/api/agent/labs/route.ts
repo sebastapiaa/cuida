@@ -3,6 +3,7 @@ import { record } from "@/lib/platform";
 import { cachedTrend, computeAndCache, daytonaConfigured, refreshTrend, type TrendLab } from "@/lib/daytona";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 type LabKey = keyof typeof record.labs;
 

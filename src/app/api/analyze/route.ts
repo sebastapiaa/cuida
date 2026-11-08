@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { daytonaConfigured, getSandbox } from "@/lib/daytona";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 // Pre-warms the Daytona sandbox so the agent's first lab analysis is fast.
 export async function GET() {

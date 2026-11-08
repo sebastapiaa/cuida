@@ -65,6 +65,19 @@ The script ends with a reachability check and a link to the agent. Open it, clic
 ### Watching the agent touch the data
 `curl localhost:3000/api/agent/feed` shows every tool call (with ms), and every dose, reading, question, refill and text the agent wrote. `curl -X DELETE localhost:3000/api/agent/feed` resets the demo.
 
+## Deploy on Vercel
+
+1. Import the GitHub repo in Vercel (framework Next.js, root directory `.`; defaults are fine).
+2. Storage -> add **Upstash Redis** from the Marketplace and connect it to the project. It injects `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; without them each serverless instance keeps its own memory and the agent's writes may not show on the screen.
+3. Environment variables (Production): `ELEVENLABS_API_KEY`, `NEXT_PUBLIC_ELEVENLABS_AGENT_ID`, `CUIDA_AGENT_KEY` (same value as in your `.env.local`), `DAYTONA_API_KEY`, optional `DAYTONA_SANDBOX_ID`, optional Twilio vars.
+4. Deploy, then point the agent's tools at the deployment from your laptop:
+
+   ```bash
+   PUBLIC_URL=https://<your-app>.vercel.app npm run sync:agent
+   ```
+
+   Re-run it if you later switch back to the local tunnel (`npm run up` does that for you).
+
 ## Status
 - Done: mock records, ingestion + search, 11 read/write endpoints, agent prompt + tools, sync script.
 - On hold: the phone-mockup demo screen (`src/components/Stage.tsx`) still uses the earlier client-tool version; it will be rewired to read `/api/agent/feed`.
