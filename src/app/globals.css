@@ -1,26 +1,197 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cream: #f4eee5;
+  --paper: #fbf8f3;
+  --ink-1: #1d2b24;
+  --ink-2: #4a564f;
+  --ink-3: #8a918b;
+  --terracotta: #c8603d;
+  --amber: #e9a65b;
+  --sage: #dfe8dc;
+  --sage-ink: #2f6b4a;
+  --line: rgba(29, 43, 36, 0.09);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: "Fraunces Variable", Georgia, serif;
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body { background: var(--cream); color: var(--ink-1); font-family: var(--font-sans); }
+
+.stage {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1200px 600px at 12% -10%, #fbe3cf 0%, transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, #e2ebdd 0%, transparent 60%),
+    var(--cream);
+  overflow: hidden;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.font-display { font-family: var(--font-display); font-optical-sizing: auto; }
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 46px;
+  line-height: 1;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--terracotta);
+}
+
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; color: var(--ink-2);
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--line);
+  padding: 6px 11px; border-radius: 999px;
+  backdrop-filter: blur(6px);
+}
+.dot { width: 7px; height: 7px; border-radius: 99px; background: #b9bdb8; }
+.dot-live { background: #2f9e5b; box-shadow: 0 0 0 4px rgba(47, 158, 91, 0.18); animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(47, 158, 91, 0.05); } }
+
+/* ---------- phone mockups ---------- */
+.phone {
+  position: relative;
+  width: 380px; height: min(800px, calc(100vh - 140px));
+  border-radius: 56px;
+  padding: 12px;
+  background: linear-gradient(145deg, #2b2b2b, #0e0e0e);
+  box-shadow:
+    0 0 0 1.5px #3a3a3a inset,
+    0 40px 80px -30px rgba(40, 30, 20, 0.45),
+    0 18px 36px -18px rgba(40, 30, 20, 0.35);
+}
+.phone-sm { width: 300px; height: min(520px, calc(100vh - 380px)); border-radius: 46px; padding: 10px; }
+.phone-notch {
+  position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+  width: 108px; height: 30px; border-radius: 20px; background: #050505; z-index: 3;
+}
+.phone-sm .phone-notch { top: 18px; width: 88px; height: 25px; }
+.phone-screen {
+  width: 100%; height: 100%;
+  border-radius: 45px; overflow: hidden;
+  background: var(--paper);
+  display: flex; flex-direction: column;
+}
+.phone-sm .phone-screen { border-radius: 37px; }
+.statusbar {
+  display: flex; justify-content: space-between;
+  padding: 18px 30px 6px; font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+}
+.statusbar span:last-child { font-size: 10px; letter-spacing: 0.05em; }
+.phone-sm .statusbar { padding: 15px 24px 4px; font-size: 11.5px; }
+
+/* ---------- orb ---------- */
+.orb-btn { border-radius: 999px; outline: none; }
+.orb-btn:focus-visible { box-shadow: 0 0 0 4px rgba(200, 96, 61, 0.35); }
+.orb {
+  --v: 0;
+  width: 168px; height: 168px; border-radius: 999px;
+  display: grid; place-items: center; color: white;
+  background: radial-gradient(circle at 34% 30%, #f6c48b 0%, var(--amber) 28%, var(--terracotta) 72%, #9f4426 100%);
+  box-shadow:
+    0 0 0 calc(10px + var(--v) * 26px) rgba(200, 96, 61, 0.12),
+    0 0 0 calc(22px + var(--v) * 46px) rgba(200, 96, 61, 0.06),
+    0 24px 40px -14px rgba(160, 70, 40, 0.55);
+  transform: scale(calc(1 + var(--v) * 0.06));
+  transition: box-shadow 90ms linear, transform 90ms linear;
+  cursor: pointer;
+}
+.orb:not(.orb-speaking):not(.orb-listening) { animation: breathe 3.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.035); } }
+.orb-listening { background: radial-gradient(circle at 34% 30%, #cfe3cf 0%, #8fbf98 30%, #3f8a62 75%, #2b6448 100%); }
+
+.caption { font-family: var(--font-display); font-size: 22px; line-height: 1.32; letter-spacing: -0.005em; padding: 0 4px; }
+
+.soft-card, .record-card {
+  background: white; border: 1px solid var(--line); border-radius: 22px; padding: 15px 16px;
+  box-shadow: 0 6px 18px -12px rgba(40, 30, 20, 0.25);
+}
+.alert-card {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: #fbe6dc; color: #7a3018; border-radius: 22px; padding: 14px 16px;
+}
+.pill-swatch { width: 22px; height: 12px; border-radius: 99px; border: 1px solid rgba(0,0,0,0.12); background: #fff; }
+.pill-apixaban { background: #f2a7a4; }
+.pill-metformin { background: #fff; width: 26px; }
+.pill-atorvastatin { background: #fff; width: 13px; height: 13px; }
+
+.kind {
+  flex: none; width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--sage); color: var(--sage-ink);
+}
+.kind-medication { background: #fbe1d6; color: #a2482a; }
+.kind-appointment { background: #e4e6f6; color: #3d4596; }
+.kind-lab { background: #f8ecd4; color: #8b5b14; }
+.kind-allergy { background: #f8dcdc; color: #9c2f2f; }
+
+/* ---------- panel ---------- */
+.panel {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 30px 60px -40px rgba(40, 30, 20, 0.4);
+}
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--ink-3); font-weight: 600; }
+.sub-eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--ink-3); margin-bottom: 10px; font-weight: 600; }
+.metric { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+
+.trace { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.trace code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.engine {
+  flex: none; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+  padding: 2px 7px; border-radius: 6px; background: var(--sage); color: var(--sage-ink);
+}
+.engine-daytona { background: #1d2b24; color: #f4eee5; }
+.engine-server { background: #fbe1d6; color: #a2482a; }
+.engine-local { background: #eee; color: #666; }
+
+.bubble { font-size: 13.5px; line-height: 1.45; padding: 9px 12px; border-radius: 14px; }
+.bubble .who { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-3); margin-bottom: 2px; font-weight: 600; }
+.bubble-user { background: var(--sage); margin-left: 18px; }
+.bubble-agent { background: var(--paper); border: 1px solid var(--line); margin-right: 18px; }
+
+.type-box {
+  flex: 1; font-size: 13px; padding: 9px 12px; border-radius: 12px;
+  background: var(--paper); border: 1px solid var(--line); outline: none;
+}
+.type-box:focus { border-color: var(--terracotta); }
+
+/* ---------- Ana ---------- */
+.sms {
+  background: #e9e9eb; color: #111; font-size: 13.5px; line-height: 1.4;
+  padding: 9px 12px; border-radius: 18px; border-bottom-left-radius: 6px; max-width: 92%;
+}
+.sms-urgent { background: #fde2dd; }
+.sms-tag {
+  display: inline-block; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  background: var(--terracotta); color: white; padding: 1px 6px; border-radius: 5px; margin-right: 6px; vertical-align: 1px;
+}
+.action-card {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: white; border: 1px solid var(--line); border-radius: 16px; padding: 11px 13px;
+}
+.check { flex: none; width: 24px; height: 24px; border-radius: 99px; background: var(--sage-ink); color: white; display: grid; place-items: center; }
+
+/* ---------- motion ---------- */
+.fade-in { animation: fade 320ms ease-out both; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+.rise { animation: rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+.thin-scroll { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.12) transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  .orb, .fade-in, .rise, .dot-live { animation: none !important; transition: none !important; }
 }

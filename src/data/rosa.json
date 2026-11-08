@@ -1,0 +1,100 @@
+{
+  "patient": {
+    "name": "Rosa Delgado",
+    "preferredName": "Rosa",
+    "age": 78,
+    "dob": "1948-03-14",
+    "city": "Chula Vista, CA",
+    "languages": ["Spanish", "English"],
+    "family": [
+      { "name": "Ana Delgado", "relation": "daughter", "phone": "(619) 555-0142", "primary": true },
+      { "name": "Miguel Delgado", "relation": "son", "phone": "(619) 555-0187", "primary": false }
+    ]
+  },
+  "insurance": {
+    "plan": "Golden Coast Medicare Advantage (HMO)",
+    "memberId": "GCM-448-219-07",
+    "copays": "Primary care $0. Specialist visit $20. Tier 1 generic prescriptions $0. Brand-name Eliquis $47 per 30-day fill.",
+    "phone": "(800) 555-0199"
+  },
+  "careTeam": [
+    { "name": "Dr. Elena Ruiz", "role": "Primary care doctor", "clinic": "Bayview Family Medicine", "address": "1200 Third Ave, Suite 210, Chula Vista", "phone": "(619) 555-0110" },
+    { "name": "Dr. Marcus Chen", "role": "Cardiologist (heart doctor)", "clinic": "Pacific Heart Clinic", "address": "4060 Fourth Ave, San Diego", "phone": "(619) 555-0133" },
+    { "name": "Dr. Sofia Navarro", "role": "Eye doctor (ophthalmologist)", "clinic": "Coastal Eye Center", "address": "870 Palomar St, Chula Vista", "phone": "(619) 555-0161" },
+    { "name": "Harbor Pharmacy", "role": "Pharmacy", "clinic": "Harbor Pharmacy", "address": "455 Broadway, Chula Vista", "phone": "(619) 555-0175", "hours": "Mon to Sat 8am to 9pm, Sun 10am to 6pm" }
+  ],
+  "conditions": [
+    { "name": "Type 2 diabetes", "since": "2011", "plain": "Blood sugar runs high. Managed with metformin, walking, and diet." },
+    { "name": "High blood pressure (hypertension)", "since": "2014", "plain": "Managed with lisinopril." },
+    { "name": "Atrial fibrillation (AFib)", "since": "2023", "plain": "Irregular heartbeat that raises stroke risk. Takes Eliquis, a blood thinner, to prevent clots." },
+    { "name": "High cholesterol", "since": "2016", "plain": "Managed with atorvastatin." },
+    { "name": "Osteoarthritis, right knee", "since": "2020", "plain": "Wear-and-tear knee pain. Tylenol as needed, physical therapy referral sent." }
+  ],
+  "allergies": [
+    { "substance": "Penicillin", "reaction": "Hives", "noted": "1994" },
+    { "substance": "Sulfa drugs", "reaction": "Rash", "noted": "2008" }
+  ],
+  "medications": [
+    {
+      "id": "apixaban", "name": "Eliquis (apixaban)", "dose": "5 mg", "purpose": "Blood thinner. Prevents stroke from AFib.",
+      "schedule": ["morning", "evening"], "howToTake": "1 tablet twice a day, about 12 hours apart, with or without food.",
+      "appearance": "Pink oval tablet", "prescriber": "Dr. Marcus Chen", "lastFilled": "2026-10-14", "daysSupply": 30, "refillsLeft": 0,
+      "notes": "Do not skip doses. If a dose is missed, take it the same day as soon as remembered. Never take two doses at once."
+    },
+    {
+      "id": "metformin", "name": "Metformin", "dose": "500 mg", "purpose": "Lowers blood sugar (diabetes).",
+      "schedule": ["morning", "evening"], "howToTake": "1 tablet with breakfast and 1 tablet with dinner.",
+      "appearance": "Large white oval tablet", "prescriber": "Dr. Elena Ruiz", "lastFilled": "2026-10-20", "daysSupply": 90, "refillsLeft": 2,
+      "notes": "Take with food to avoid an upset stomach."
+    },
+    {
+      "id": "lisinopril", "name": "Lisinopril", "dose": "10 mg", "purpose": "Lowers blood pressure.",
+      "schedule": ["morning"], "howToTake": "1 tablet every morning.",
+      "appearance": "Small yellow round tablet", "prescriber": "Dr. Elena Ruiz", "lastFilled": "2026-09-30", "daysSupply": 90, "refillsLeft": 3,
+      "notes": "Dose increased from 5 mg to 10 mg on March 10, 2026."
+    },
+    {
+      "id": "atorvastatin", "name": "Atorvastatin", "dose": "20 mg", "purpose": "Lowers cholesterol.",
+      "schedule": ["bedtime"], "howToTake": "1 tablet at bedtime.",
+      "appearance": "Small white round tablet", "prescriber": "Dr. Elena Ruiz", "lastFilled": "2026-09-30", "daysSupply": 90, "refillsLeft": 3,
+      "notes": ""
+    },
+    {
+      "id": "vitamin-d", "name": "Vitamin D3", "dose": "1,000 IU", "purpose": "Bone health.",
+      "schedule": ["morning"], "howToTake": "1 softgel with breakfast.",
+      "appearance": "Small clear yellow softgel", "prescriber": "Dr. Elena Ruiz (over the counter)", "lastFilled": "", "daysSupply": 0, "refillsLeft": 0,
+      "notes": "Over the counter."
+    },
+    {
+      "id": "acetaminophen", "name": "Tylenol (acetaminophen)", "dose": "500 mg", "purpose": "Knee pain, as needed.",
+      "schedule": ["as needed"], "howToTake": "1 to 2 tablets every 6 hours if needed. Dr. Ruiz says no more than 3,000 mg in one day.",
+      "appearance": "White capsule-shaped tablet", "prescriber": "Dr. Elena Ruiz (over the counter)", "lastFilled": "", "daysSupply": 0, "refillsLeft": 0,
+      "notes": "Use this instead of Advil, Motrin, or Aleve."
+    }
+  ],
+  "appointments": [
+    { "id": "appt-chen", "date": "2026-11-12", "time": "10:30 AM", "with": "Dr. Marcus Chen", "type": "Cardiology follow-up", "where": "Pacific Heart Clinic, 4060 Fourth Ave, San Diego", "prep": "Arrive 15 minutes early. Bring your medication list. Ask about knee pain options that are safe with Eliquis. Ana is driving." },
+    { "id": "appt-lab", "date": "2026-11-17", "time": "9:00 AM", "with": "Bayview lab", "type": "Fasting blood draw (A1C and cholesterol)", "where": "Bayview Family Medicine, 1200 Third Ave, Suite 210, Chula Vista", "prep": "No food after midnight. Water is fine. Take Eliquis as usual. Wait to take metformin until you eat after the draw." },
+    { "id": "appt-ruiz", "date": "2026-12-03", "time": "2:15 PM", "with": "Dr. Elena Ruiz", "type": "Diabetes check and lab review", "where": "Bayview Family Medicine, 1200 Third Ave, Suite 210, Chula Vista", "prep": "Bring your blood sugar log." },
+    { "id": "appt-navarro", "date": "2027-01-14", "time": "11:00 AM", "with": "Dr. Sofia Navarro", "type": "Yearly diabetic eye exam", "where": "Coastal Eye Center, 870 Palomar St, Chula Vista", "prep": "Your eyes will be dilated. Bring sunglasses and someone to drive you home." }
+  ],
+  "visits": [
+    { "id": "visit-2026-09-22", "date": "2026-09-22", "with": "Dr. Elena Ruiz", "summary": "A1C improved to 6.9, now at goal. Keep metformin the same. Flu shot given. Walk 20 minutes a day. For knee pain use Tylenol; referral sent to Coastal Physical Therapy." },
+    { "id": "visit-2026-08-05", "date": "2026-08-05", "with": "Dr. Marcus Chen", "summary": "AFib well controlled. Continue Eliquis 5 mg twice a day. Do not take ibuprofen (Advil, Motrin) or naproxen (Aleve) because they raise bleeding risk with Eliquis. Use Tylenol for pain. Blood pressure 132/78. Follow up in 3 months." },
+    { "id": "visit-2026-03-10", "date": "2026-03-10", "with": "Dr. Elena Ruiz", "summary": "Blood pressure was 148/90, so lisinopril was increased from 5 mg to 10 mg. Recheck in 6 months." },
+    { "id": "visit-2025-12-02", "date": "2025-12-02", "with": "Dr. Sofia Navarro", "summary": "Diabetic eye exam. No diabetic eye disease found. New reading glasses prescribed. Come back in one year." }
+  ],
+  "labs": {
+    "a1c": { "label": "A1C (3-month average blood sugar)", "unit": "%", "goal": "below 7.0", "goalMax": 7.0, "series": [["2025-02-11", 8.1], ["2025-08-19", 7.6], ["2026-02-24", 7.2], ["2026-09-15", 6.9]] },
+    "ldl": { "label": "LDL cholesterol (the bad kind)", "unit": "mg/dL", "goal": "below 100", "goalMax": 100, "series": [["2025-02-11", 128], ["2025-08-19", 104], ["2026-02-24", 96], ["2026-09-15", 88]] },
+    "blood_pressure": { "label": "Blood pressure, top number (systolic)", "unit": "mmHg", "goal": "below 130", "goalMax": 130, "series": [["2025-02-11", 146], ["2025-08-19", 150], ["2026-03-10", 148], ["2026-08-05", 132], ["2026-09-22", 128]] },
+    "egfr": { "label": "eGFR (kidney function)", "unit": "mL/min", "goal": "above 60", "goalMin": 60, "series": [["2025-02-11", 68], ["2025-08-19", 66], ["2026-02-24", 67], ["2026-09-15", 65]] },
+    "weight": { "label": "Weight", "unit": "lb", "goal": "slow, steady loss", "series": [["2025-02-11", 168], ["2025-08-19", 165], ["2026-02-24", 162], ["2026-09-22", 159]] }
+  },
+  "vaccines": [
+    { "name": "Flu shot", "date": "2026-09-22" },
+    { "name": "COVID-19 updated booster", "date": "2025-10-07" },
+    { "name": "Shingles (Shingrix), 2 doses", "date": "2024-05-16" },
+    { "name": "Pneumonia (pneumococcal)", "date": "2023-04-03" }
+  ]
+}
