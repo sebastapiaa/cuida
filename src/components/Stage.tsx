@@ -2,82 +2,92 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConversation } from "@elevenlabs/react";
-import { buildChunks, createIndex, prettyDate, record, type Chunk } from "@/lib/records";
-import type { CareAction } from "@/app/api/actions/route";
-import {
-  BoltIcon,
-  CheckIcon,
-  MicIcon,
-  AlertIcon,
-  kindIcon,
-} from "./icons";
+import { prettyDate, record } from "@/lib/records";
+import type { FeedEvent } from "@/lib/platform";
+import { BoltIcon, CheckIcon, MicIcon, AlertIcon, kindIcon } from "./icons";
 
 /* ------------------------------------------------------------------ */
-/* Record index (built once, in the browser, from Rosa's fake record)  */
+/* The demo screen reads everything from the platform: GET /api/agent/feed  */
+/* holds every tool call the ElevenLabs agent made and every write     */
+/* (doses, readings, questions, refills, texts). Nothing runs in the   */
+/* browser except the voice connection itself.                         */
 /* ------------------------------------------------------------------ */
-const CHUNKS = buildChunks();
-const INDEX = createIndex(CHUNKS);
-const byId = (id: string) => CHUNKS.find((c) => c.id === id)!;
-
 type LabKey = keyof typeof record.labs;
-type Trace = {
-  id: string;
-  tool: string;
-  args: string;
-  ms: number;
-  engine: "browser index" | "daytona sandbox" | "local fallback" | "server action";
-  preview: string;
-  ok: boolean;
-};
+type Med = (typeof record.medications)[number];
 type Line = { role: "user" | "agent"; text: string; id: number };
-type Surfaced = { chunk: Chunk; trend?: TrendResult; at: number };
-type TrendResult = {
-  test: string;
-  unit: string;
-  goal: string;
-  first: { date: string; value: number };
-  latest: { date: string; value: number };
-  change: number;
-  percent_change: number;
-  direction: string;
-  at_goal: boolean;
+type Trend = { first: { date: string; value: number }; latest: { date: string; value: number }; direction: string; at_goal: boolean; unit: string };
+type Card = { id: string; kind: string; title: string; subtitle: string; source: string; lab?: LabKey; trend?: Trend; at: number };
+type Feed = {
+  feed: FeedEvent[];
+  doses: { medication: string; medId: string; time_of_day: string; date: string; ts: number }[];
+  vitals: { type: string; value: string; unit: string; ts: number; flag: string }[];
+  questions: { [apptId: string]: string[] };
+  refills: { medId: string; ts: number }[];
+  index: { documents: number; passages: number };
 };
+const EMPTY: Feed = { feed: [], doses: [], vitals: [], questions: {}, refills: [], index: { documents: 0, passages: 0 } };
 
 const today = () => new Date();
-const isoToday = () => {
-  const d = today();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-const runsOut = (m: (typeof record.medications)[number]) => {
+const runsOut = (m: Med) => {
   if (!m.lastFilled) return null;
   const d = new Date(m.lastFilled + "T12:00:00");
   d.setDate(d.getDate() + m.daysSupply);
   return d;
 };
 const daysUntil = (d: Date) => Math.ceil((d.getTime() - today().getTime()) / 86400000);
+const medCard = (m: Med, at: number): Card => ({ id: m.id, kind: "medication", title: `${m.name} ${m.dose}`, subtitle: `${m.appearance} · ${m.schedule.join(" + ")}`, source: `Pharmacy medication list · ${m.prescriber}`, at });
+const apptCard = (a: (typeof record.appointments)[number], at: number): Card => ({ id: a.id, kind: "appointment", title: a.type, subtitle: `${prettyDate(a.date)} · ${a.time}`, source: `Appointments · ${a.with}`, at });
+const labCard = (key: LabKey, at: number, trend?: Trend): Card => {
+  const lab = record.labs[key];
+  const last = lab.series[lab.series.length - 1];
+  return { id: `lab-${key}`, kind: "lab", title: lab.label, subtitle: `Latest ${last[1]} ${lab.unit} · ${last[0]}`, source: `Lab results · ${lab.goal}`, lab: key, trend, at };
+};
+const findMeds = (q: string, time?: string): Med[] => {
+  const n = (q || "").toLowerCase();
+  if (/all|todas|everything/.test(n)) return record.medications.filter((m) => !time || m.schedule.includes(time));
+  return record.medications.filter((m) => n.includes(m.id) || m.name.toLowerCase().split(/\W+/).some((w) => w.length > 3 && n.includes(w)) || m.appearance.toLowerCase().split(" ").some((w) => w.length > 3 && n.includes(w)));
+};
 
-function localTrend(key: LabKey): TrendResult {
-  const lab = record.labs[key] as { label: string; unit: string; goal: string; goalMax?: number; goalMin?: number; series: (string | number)[][] };
-  const s = lab.series as [string, number][];
-  const first = s[0], last = s[s.length - 1];
-  const change = +(last[1] - first[1]).toFixed(2);
-  const lowerBetter = lab.goalMax !== undefined;
-  const atGoal = (lab.goalMax === undefined || last[1] < lab.goalMax) && (lab.goalMin === undefined || last[1] > lab.goalMin);
-  return {
-    test: lab.label, unit: lab.unit, goal: lab.goal,
-    first: { date: first[0], value: first[1] }, latest: { date: last[0], value: last[1] },
-    change, percent_change: +((change / first[1]) * 100).toFixed(1),
-    direction: change === 0 ? "steady" : (change < 0) === lowerBetter ? "improving" : "getting worse",
-    at_goal: atGoal,
-  };
+// What to show on Rosa's phone for each tool call the agent made
+function cardsFor(e: FeedEvent): Card[] {
+  const a = (e.args ?? {}) as Record<string, string>;
+  const d = (e.detail ?? {}) as Record<string, unknown>;
+  const at = e.ts;
+  switch (e.tool) {
+    case "get_medications":
+      return record.medications.filter((m) => !a.time_of_day || a.time_of_day === "all" || m.schedule.includes(a.time_of_day)).map((m) => medCard(m, at));
+    case "log_dose":
+    case "request_refill":
+      return findMeds(a.medication, a.time_of_day).map((m) => medCard(m, at));
+    case "get_appointments": {
+      const now = today().toISOString().slice(0, 10);
+      const up = record.appointments.filter((x) => x.date >= now);
+      return (a.range === "next" ? up.slice(0, 1) : up).map((x) => apptCard(x, at));
+    }
+    case "add_question_for_doctor": {
+      const saved = String(d.saved_to ?? "");
+      const appt = record.appointments.find((x) => saved.includes(x.with)) ?? record.appointments[0];
+      return [apptCard(appt, at)];
+    }
+    case "analyze_lab_trend":
+      return a.test && record.labs[a.test as LabKey] ? [labCard(a.test as LabKey, at, d.first ? (d as unknown as Trend) : undefined)] : [];
+    case "log_home_reading":
+      return [{ id: `vital-${at}`, kind: "lab", title: `${String(a.type ?? "").replace("_", " ")} ${a.value}`, subtitle: `${String(d.flag ?? "").replace("_", " ")}${d.guidance ? " · " + String(d.guidance).slice(0, 80) : ""}`, source: "Home reading saved to your record", at }];
+    case "search_records": {
+      const results = (d.results as { document: string; from: string; date: string | null; excerpt: string }[] | undefined) ?? [];
+      return results.slice(0, 3).map((r, i) => ({ id: `doc-${at}-${i}`, kind: "visit", title: r.document, subtitle: r.excerpt.replace(/\s+/g, " ").slice(0, 110) + (r.excerpt.length > 110 ? "…" : ""), source: `${r.from}${r.date ? " · " + r.date : ""}`, at }));
+    }
+    case "read_document":
+      return d.title ? [{ id: `doc-${at}`, kind: "visit", title: String(d.title), subtitle: String(d.from ?? ""), source: d.date ? `Document · ${d.date}` : "Document", at }] : [];
+    default:
+      return [];
+  }
 }
 
 /* ------------------------------------------------------------------ */
 export default function Stage() {
-  const [traces, setTraces] = useState<Trace[]>([]);
+  const [data, setData] = useState<Feed>(EMPTY);
   const [lines, setLines] = useState<Line[]>([]);
-  const [surfaced, setSurfaced] = useState<Surfaced[]>([]);
-  const [actions, setActions] = useState<CareAction[]>([]);
   const [latencies, setLatencies] = useState<number[]>([]);
   const [engine, setEngine] = useState<"daytona" | "local" | "warming">("warming");
   const [error, setError] = useState<string | null>(null);
@@ -85,122 +95,7 @@ export default function Stage() {
   const userEndAt = useRef<number | null>(null);
   const lineId = useRef(0);
 
-  const trace = useCallback((t: Omit<Trace, "id">) => {
-    setTraces((p) => [{ ...t, id: crypto.randomUUID() }, ...p].slice(0, 40));
-  }, []);
-  const surface = useCallback((items: Surfaced[]) => {
-    if (items.length) setSurfaced(items);
-  }, []);
-
-  // Pre-warm the Daytona sandbox + load prior actions
-  useEffect(() => {
-    fetch("/api/analyze").then((r) => r.json()).then((d) => setEngine(d.engine === "daytona" && d.ready ? "daytona" : "local")).catch(() => setEngine("local"));
-    fetch("/api/actions").then((r) => r.json()).then(setActions).catch(() => {});
-  }, []);
-
-  /* ---------------- client tools (run in the browser) ---------------- */
-  const clientTools = useMemo(
-    () => ({
-      search_records: async ({ query }: { query: string }) => {
-        const t = performance.now();
-        const hits = INDEX.search(query, 3);
-        const ms = performance.now() - t;
-        surface(hits.map((h) => ({ chunk: h.chunk, at: Date.now() })));
-        trace({ tool: "search_records", args: `"${query}"`, ms, engine: "browser index", preview: hits.map((h) => h.chunk.title).join(" · ") || "no match", ok: hits.length > 0 });
-        if (!hits.length) return "No matching record found. Tell Rosa honestly that her records do not say.";
-        return JSON.stringify({ today: isoToday(), results: hits.map((h) => ({ title: h.chunk.title, details: h.chunk.text, source: h.chunk.source })) });
-      },
-
-      get_medication_schedule: async ({ time_of_day }: { time_of_day: string }) => {
-        const t = performance.now();
-        const meds = record.medications.filter((m) => time_of_day === "all" || m.schedule.includes(time_of_day));
-        surface(meds.map((m) => ({ chunk: byId(m.id), at: Date.now() })));
-        trace({ tool: "get_medication_schedule", args: time_of_day, ms: performance.now() - t, engine: "browser index", preview: meds.map((m) => m.name.split(" ")[0]).join(", "), ok: true });
-        return JSON.stringify(
-          meds.map((m) => {
-            const out = runsOut(m);
-            return { name: m.name, dose: m.dose, purpose: m.purpose, how: m.howToTake, looks_like: m.appearance, refills_left: m.refillsLeft, runs_out: out ? out.toDateString() : null };
-          })
-        );
-      },
-
-      get_appointments: async ({ range }: { range: string }) => {
-        const t = performance.now();
-        const now = isoToday();
-        let items: Chunk[];
-        if (range === "past") items = record.visits.map((v) => byId(v.id));
-        else {
-          const up = record.appointments.filter((a) => a.date >= now).map((a) => byId(a.id));
-          items = range === "next" ? up.slice(0, 1) : up;
-        }
-        surface(items.map((c) => ({ chunk: c, at: Date.now() })));
-        trace({ tool: "get_appointments", args: range, ms: performance.now() - t, engine: "browser index", preview: items.map((c) => c.subtitle.split(" · ")[0]).join(" · "), ok: true });
-        return JSON.stringify({ today: now, items: items.map((c) => c.text) });
-      },
-
-      analyze_lab_trend: async ({ test }: { test: string }) => {
-        const key = test as LabKey;
-        if (!record.labs[key]) return `Unknown test ${test}.`;
-        const t = performance.now();
-        let result: TrendResult;
-        let eng: Trace["engine"] = "daytona sandbox";
-        try {
-          const r = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ test }) });
-          const d = await r.json();
-          if (!r.ok || !d.result) throw new Error(d.error || "sandbox error");
-          result = d.result;
-        } catch {
-          result = localTrend(key);
-          eng = "local fallback";
-        }
-        const ms = performance.now() - t;
-        surface([{ chunk: byId(`lab-${key}`), trend: result, at: Date.now() }]);
-        trace({ tool: "analyze_lab_trend", args: test, ms, engine: eng, preview: `${result.first.value} → ${result.latest.value} ${result.unit} · ${result.direction}`, ok: true });
-        return JSON.stringify(result);
-      },
-
-      request_refill: async ({ medication }: { medication: string }) => {
-        const t = performance.now();
-        const q = medication.toLowerCase();
-        const med = record.medications.find((m) => m.name.toLowerCase().includes(q) || m.id.includes(q) || q.includes(m.id));
-        if (!med) return `Could not find ${medication} in Rosa's medication list.`;
-        const pharmacy = record.careTeam.find((c) => c.role === "Pharmacy")!;
-        const res = await fetch("/api/actions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "refill_request", title: `Refill: ${med.name} ${med.dose}`, body: `Sent to ${pharmacy.name} and ${med.prescriber}'s office`, to: pharmacy.name }),
-        });
-        const action: CareAction = await res.json();
-        setActions((p) => [action, ...p]);
-        surface([{ chunk: byId(med.id), at: Date.now() }]);
-        trace({ tool: "request_refill", args: med.name, ms: performance.now() - t, engine: "server action", preview: `→ ${pharmacy.name} + ${med.prescriber}`, ok: true });
-        return `Refill request for ${med.name} ${med.dose} sent to ${pharmacy.name} (${pharmacy.address}, ${pharmacy.phone}) and to ${med.prescriber}'s office for approval. Usually ready in 1 to 2 business days.`;
-      },
-
-      notify_family: async ({ message, urgency }: { message: string; urgency: "fyi" | "soon" | "urgent" }) => {
-        const t = performance.now();
-        const ana = record.patient.family.find((f) => f.primary)!;
-        const res = await fetch("/api/actions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "family_message", title: "Message to Ana", body: message, urgency, to: ana.name }),
-        });
-        const action: CareAction = await res.json();
-        setActions((p) => [action, ...p]);
-        trace({ tool: "notify_family", args: urgency, ms: performance.now() - t, engine: "server action", preview: `text → ${ana.name}${action.sms === "sent" ? " (SMS delivered)" : ""}`, ok: true });
-        return `Text sent to ${ana.name}.`;
-      },
-    }),
-    [surface, trace]
-  );
-
-  // Handy for testing tools from the browser console before the agent is set up: __cuida.search_records({query:"pink pill"})
-  useEffect(() => {
-    (window as unknown as { __cuida: typeof clientTools }).__cuida = clientTools;
-  }, [clientTools]);
-
   const conversation = useConversation({
-    clientTools,
     onConnect: () => setError(null),
     onError: (m: string) => setError(String(m)),
     onMessage: (m) => {
@@ -216,9 +111,24 @@ export default function Stage() {
       }
     },
   });
-
   const { status, isSpeaking } = conversation;
   const connected = status === "connected";
+
+  // Platform feed: poll fast while talking, slower when idle
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch("/api/agent/feed", { cache: "no-store" });
+      if (r.ok) setData(await r.json());
+    } catch {}
+  }, []);
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, connected ? 700 : 2500);
+    return () => clearInterval(id);
+  }, [refresh, connected]);
+  useEffect(() => {
+    fetch("/api/analyze").then((r) => r.json()).then((d) => setEngine(d.engine === "daytona" && d.ready ? "daytona" : "local")).catch(() => setEngine("local"));
+  }, []);
 
   const start = async () => {
     setError(null);
@@ -227,26 +137,19 @@ export default function Stage() {
       const { token } = await fetch("/api/token").then((r) => r.json()).catch(() => ({ token: null }));
       const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
       if (!token && !agentId) {
-        setError("Set NEXT_PUBLIC_ELEVENLABS_AGENT_ID in .env.local (run npm run setup:agent).");
+        setError("Set NEXT_PUBLIC_ELEVENLABS_AGENT_ID in .env.local (run npm run up).");
         return;
       }
-      const d = today();
-      conversation.startSession({
-        ...(token ? { conversationToken: token, connectionType: "webrtc" as const } : { agentId: agentId!, connectionType: "webrtc" as const }),
-        onConnect: () => {
-          conversation.sendContextualUpdate(
-            `Today is ${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} Pacific time.`
-          );
-        },
-      });
+      conversation.startSession(token ? { conversationToken: token, connectionType: "webrtc" as const } : { agentId: agentId!, connectionType: "webrtc" as const });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
   const reset = async () => {
-    await fetch("/api/actions", { method: "DELETE" });
-    setActions([]); setTraces([]); setLines([]); setSurfaced([]); setLatencies([]);
+    await fetch("/api/agent/feed", { method: "DELETE" });
+    setLines([]); setLatencies([]);
+    refresh();
   };
 
   /* ---------------- live volume for the orb ---------------- */
@@ -267,6 +170,19 @@ export default function Stage() {
     return () => cancelAnimationFrame(raf);
   }, [connected, isSpeaking, conversation]);
 
+  /* ---------------- derived from the platform feed ---------------- */
+  const toolCalls = useMemo(() => data.feed.filter((e) => e.kind === "tool_call"), [data.feed]);
+  const texts = useMemo(() => data.feed.filter((e) => e.kind === "family_message"), [data.feed]);
+  const actions = useMemo(() => data.feed.filter((e) => ["refill_requested", "question_added", "dose_logged", "vital_logged"].includes(e.kind)), [data.feed]);
+  const surfaced = useMemo(() => {
+    // the most recent tool call that has something to show, plus anything from the same second
+    for (const e of toolCalls) {
+      const cards = cardsFor(e);
+      if (cards.length) return cards.slice(0, 4);
+    }
+    return [];
+  }, [toolCalls]);
+
   const lastAgent = [...lines].reverse().find((l) => l.role === "agent");
   const lastUser = [...lines].reverse().find((l) => l.role === "user");
   const lastLatency = latencies.at(-1);
@@ -275,10 +191,12 @@ export default function Stage() {
   const lowMeds = record.medications
     .map((m) => ({ m, out: runsOut(m) }))
     .filter((x) => x.out && x.m.refillsLeft === 0 && daysUntil(x.out) <= 10)
-    .filter((x) => !actions.some((a) => a.kind === "refill_request" && a.title.includes(x.m.name)));
+    .filter((x) => !data.refills.some((r) => r.medId === x.m.id));
 
   const hour = today().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const todayISO = today().toISOString().slice(0, 10);
+  const takenToday = data.doses.filter((d) => d.date === todayISO);
 
   return (
     <div className="stage">
@@ -329,7 +247,7 @@ export default function Stage() {
                     {surfaced.length > 0 && (
                       <div className="pt-1 space-y-2">
                         <p className="text-[11px] uppercase tracking-[0.16em] text-ink-3 px-1">From your records</p>
-                        {surfaced.map((s, i) => <RecordCard key={s.chunk.id + s.at} s={s} delay={i * 70} />)}
+                        {surfaced.map((c, i) => <RecordCard key={c.id + c.at} c={c} delay={i * 70} />)}
                       </div>
                     )}
                   </>
@@ -350,13 +268,17 @@ export default function Stage() {
                       <p className="text-[15px] text-ink-2">{prettyDate(record.appointments[0].date).replace(/, \d{4}$/, "")} · {record.appointments[0].time}</p>
                     </div>
                     <div className="soft-card">
-                      <p className="text-[12px] uppercase tracking-[0.14em] text-ink-3">Tonight</p>
-                      {record.medications.filter((m) => m.schedule.includes("evening") || m.schedule.includes("bedtime")).map((m) => (
-                        <div key={m.id} className="flex items-center gap-3 mt-2">
-                          <span className={`pill-swatch pill-${m.id}`} />
-                          <span className="text-[16px]">{m.name.split(" (")[0]} <span className="text-ink-3">{m.dose}</span></span>
-                        </div>
-                      ))}
+                      <p className="text-[12px] uppercase tracking-[0.14em] text-ink-3">Today's pills</p>
+                      {record.medications.filter((m) => !m.schedule.includes("as needed")).map((m) => {
+                        const done = takenToday.filter((d) => d.medId === m.id).map((d) => d.time_of_day);
+                        return (
+                          <div key={m.id} className="flex items-center gap-3 mt-2">
+                            <span className={`pill-swatch pill-${m.id}`} />
+                            <span className="text-[16px] flex-1">{m.name.split(" (")[0]} <span className="text-ink-3">{m.dose}</span></span>
+                            {done.length > 0 && <span className="text-[12px] text-[var(--sage-ink)] font-semibold">✓ {done.join(", ")}</span>}
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -368,34 +290,38 @@ export default function Stage() {
         {/* ================= Behind the scenes ================= */}
         <section className="panel min-h-0 flex flex-col">
           <div className="flex items-center justify-between px-6 pt-5">
-            <p className="eyebrow">Behind the scenes</p>
+            <p className="eyebrow">Behind the scenes · the agent reads and writes the platform</p>
             <button onClick={reset} className="text-[12px] text-ink-3 hover:text-ink-1">reset demo</button>
           </div>
 
           <div className="grid grid-cols-3 gap-3 px-6 pt-4">
             <Metric label="Reply time (last)" value={lastLatency ? `${(lastLatency / 1000).toFixed(2)}s` : "–"} good={lastLatency !== undefined && lastLatency < 2000} />
-            <Metric label="Reply time (avg)" value={avgLatency ? `${(avgLatency / 1000).toFixed(2)}s` : "–"} good={avgLatency !== undefined && avgLatency < 2000} />
-            <Metric label="Records indexed" value={String(INDEX.size)} sub={`${record.medications.length} meds · ${Object.values(record.labs).reduce((a, l) => a + l.series.length, 0)} labs · ${record.visits.length} visits`} />
+            <Metric label="Tool calls" value={String(toolCalls.length)} sub={toolCalls.length ? `avg ${Math.round(toolCalls.reduce((a, e) => a + (e.ms ?? 0), 0) / toolCalls.length)} ms on the server` : avgLatency ? `reply avg ${(avgLatency / 1000).toFixed(2)}s` : "none yet"} />
+            <Metric label="Records indexed" value={String(data.index.passages)} sub={`${data.index.documents} documents · ${record.medications.length} meds · ${Object.values(record.labs).reduce((a, l) => a + l.series.length, 0)} labs`} />
           </div>
 
           <div className="grid grid-cols-2 gap-5 px-6 pt-5 pb-5 min-h-0 flex-1">
             <div className="min-h-0 flex flex-col">
               <p className="sub-eyebrow">Tool calls</p>
               <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 thin-scroll">
-                {traces.length === 0 && <Empty text="Agent tool calls appear here with their run time." />}
-                {traces.map((t) => (
-                  <div key={t.id} className="trace fade-in">
-                    <div className="flex items-center justify-between">
-                      <code className="text-[13px] font-semibold">{t.tool}</code>
-                      <span className="text-[12px] tabular-nums text-ink-3">{t.ms < 10 ? t.ms.toFixed(1) : Math.round(t.ms)} ms</span>
+                {toolCalls.length === 0 && <Empty text="Agent tool calls appear here with their run time." />}
+                {toolCalls.map((t) => {
+                  const eng = t.tool === "analyze_lab_trend" ? (t.summary.includes("daytona") ? "daytona sandbox" : "local fallback") : "platform API";
+                  const err = t.summary.startsWith("error") || t.summary.startsWith("unknown") || t.summary.startsWith("missing") || t.summary.startsWith("cannot");
+                  return (
+                    <div key={t.id} className="trace fade-in">
+                      <div className="flex items-center justify-between">
+                        <code className="text-[13px] font-semibold">{t.tool}</code>
+                        <span className="text-[12px] tabular-nums text-ink-3">{t.ms} ms</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`engine engine-${eng.split(" ")[0] === "platform" ? "server" : eng.split(" ")[0]}`}>{eng}</span>
+                        <code className="text-[12px] text-ink-2 truncate">{JSON.stringify(t.args ?? {}).replace(/[{}"]/g, "").slice(0, 60)}</code>
+                      </div>
+                      <p className={`text-[12.5px] mt-1 truncate ${err ? "text-red-700" : "text-ink-2"}`}>{t.summary}</p>
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`engine engine-${t.engine.split(" ")[0]}`}>{t.engine}</span>
-                      <code className="text-[12px] text-ink-2 truncate">{t.args}</code>
-                    </div>
-                    <p className="text-[12.5px] text-ink-2 mt-1 truncate">{t.preview}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
             <div className="min-h-0 flex flex-col">
@@ -434,34 +360,35 @@ export default function Stage() {
                 <p className="text-[13px] font-semibold mt-1">cuida · Mom</p>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 no-scrollbar">
-                {actions.filter((a) => a.kind === "family_message").length === 0 && (
-                  <p className="text-center text-[12px] text-ink-3 pt-8 px-4">No texts today. Mom has not needed to call you.</p>
-                )}
-                {[...actions].reverse().filter((a) => a.kind === "family_message").map((a) => (
-                  <div key={a.id} className="fade-in">
-                    <div className={`sms ${a.urgency === "urgent" ? "sms-urgent" : ""}`}>
-                      {a.urgency && a.urgency !== "fyi" && <span className="sms-tag">{a.urgency}</span>}
-                      {a.body}
+                {texts.length === 0 && <p className="text-center text-[12px] text-ink-3 pt-8 px-4">No texts today. Mom has not needed to call you.</p>}
+                {[...texts].reverse().map((a) => {
+                  const d = (a.detail ?? {}) as { urgency?: string; sms?: string };
+                  return (
+                    <div key={a.id} className="fade-in">
+                      <div className={`sms ${d.urgency === "urgent" ? "sms-urgent" : ""}`}>
+                        {d.urgency && d.urgency !== "fyi" && <span className="sms-tag">{d.urgency}</span>}
+                        {a.summary}
+                      </div>
+                      <p className="text-[10.5px] text-ink-3 mt-1 ml-1">
+                        {new Date(a.ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                        {d.sms === "sent" ? " · delivered by SMS" : ""}
+                      </p>
                     </div>
-                    <p className="text-[10.5px] text-ink-3 mt-1 ml-1">
-                      {new Date(a.ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                      {a.sms === "sent" ? " · delivered by SMS" : ""}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          <div className="w-full mt-4 space-y-2">
-            <p className="sub-eyebrow">Actions taken</p>
-            {actions.filter((a) => a.kind === "refill_request").length === 0 && <Empty text="Refills and requests cuida sends show here." />}
-            {actions.filter((a) => a.kind === "refill_request").map((a) => (
+          <div className="w-full mt-4 space-y-2 min-h-0 overflow-y-auto thin-scroll">
+            <p className="sub-eyebrow">Written to the platform</p>
+            {actions.length === 0 && <Empty text="Doses, readings, questions and refills cuida writes show here." />}
+            {actions.map((a) => (
               <div key={a.id} className="action-card fade-in">
                 <span className="check"><CheckIcon width={14} height={14} strokeWidth={2.4} /></span>
                 <div className="min-w-0">
-                  <p className="text-[14px] font-semibold">{a.title}</p>
-                  <p className="text-[12.5px] text-ink-2">{a.body}</p>
+                  <p className="text-[14px] font-semibold">{({ refill_requested: "Refill sent", question_added: "Question saved for the doctor", dose_logged: "Dose logged", vital_logged: "Home reading saved" } as Record<string, string>)[a.kind]}</p>
+                  <p className="text-[12.5px] text-ink-2 truncate">{a.summary}</p>
                 </div>
               </div>
             ))}
@@ -487,25 +414,25 @@ function Empty({ text }: { text: string }) {
   return <p className="text-[13px] text-ink-3 border border-dashed border-black/10 rounded-xl px-3 py-3">{text}</p>;
 }
 
-function RecordCard({ s, delay }: { s: Surfaced; delay: number }) {
-  const Icon = kindIcon[s.chunk.kind];
-  const lab = s.chunk.kind === "lab" ? record.labs[s.chunk.id.replace("lab-", "") as LabKey] : null;
+function RecordCard({ c, delay }: { c: Card; delay: number }) {
+  const Icon = kindIcon[c.kind] ?? kindIcon.visit;
+  const lab = c.lab ? record.labs[c.lab] : null;
   return (
     <div className="record-card rise" style={{ animationDelay: `${delay}ms` }}>
       <div className="flex items-start gap-3">
-        <span className={`kind kind-${s.chunk.kind}`}><Icon width={17} height={17} /></span>
+        <span className={`kind kind-${c.kind}`}><Icon width={17} height={17} /></span>
         <div className="min-w-0 flex-1">
-          <p className="text-[16px] font-semibold leading-snug">{s.chunk.title}</p>
-          <p className="text-[14px] text-ink-2 leading-snug">{s.chunk.subtitle}</p>
+          <p className="text-[16px] font-semibold leading-snug">{c.title}</p>
+          <p className="text-[14px] text-ink-2 leading-snug">{c.subtitle}</p>
         </div>
       </div>
-      {lab && <Spark series={lab.series as [string, number][]} trend={s.trend} unit={lab.unit} />}
-      <p className="text-[11.5px] text-ink-3 mt-2">{s.chunk.source}</p>
+      {lab && <Spark series={lab.series as [string, number][]} trend={c.trend} unit={lab.unit} />}
+      <p className="text-[11.5px] text-ink-3 mt-2">{c.source}</p>
     </div>
   );
 }
 
-function Spark({ series, trend, unit }: { series: [string, number][]; trend?: TrendResult; unit: string }) {
+function Spark({ series, trend, unit }: { series: [string, number][]; trend?: Trend; unit: string }) {
   const w = 300, h = 54, pad = 6;
   const vs = series.map((p) => p[1]);
   const min = Math.min(...vs), max = Math.max(...vs);

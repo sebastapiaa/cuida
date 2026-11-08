@@ -179,6 +179,9 @@ async function prewarm(base) {
   }
   const r = await http(`${LOCAL}/api/analyze`, { timeout: 90_000 });
   log("warm", `${String(r.status).padEnd(3)} ${String(r.ms + "ms").padStart(7)}  GET /api/analyze (Daytona sandbox)${r.error ? "  " + r.error : ""}`);
+  // the warm-up calls are not part of the demo: start the feed clean
+  await http(`${LOCAL}/api/agent/feed`, { method: "DELETE", timeout: 5000 });
+  log("warm", "feed reset, demo screen starts clean");
 }
 
 /* 5. health loop */

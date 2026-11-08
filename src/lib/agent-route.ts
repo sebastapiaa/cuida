@@ -31,7 +31,9 @@ export function agentRoute<A>(
     try {
       const { data, summary } = await run(args);
       const ms = Math.round(performance.now() - t);
-      emit({ kind: "tool_call", tool, args, ms, summary });
+      // Attach the result to the feed event when it is small, so the demo screen can show it.
+      const detail = JSON.stringify(data).length < 8000 ? data : undefined;
+      emit({ kind: "tool_call", tool, args, ms, summary, detail });
       return done(200, { now: nowText(), today: todayISO(), ...(data as object) });
     } catch (e) {
       const ms = Math.round(performance.now() - t);
