@@ -227,7 +227,7 @@ export default function Stage() {
                       {latest && connected && (
                         <p className="text-[12px] text-ink-3 flex items-center gap-1.5 fade-in" key={latest.id}>
                           <CheckIcon width={12} height={12} strokeWidth={2.6} className="text-green" />
-                          {TOOL_LABEL[latest.tool ?? ""] ?? latest.tool} · {latest.ms} ms
+                          {TOOL_LABEL[latest.tool ?? ""] ?? latest.tool}{latest.tool === "analyze_lab_trend" && latest.summary.includes("daytona") ? " in a Daytona sandbox" : ""} · {latest.ms} ms
                         </p>
                       )}
                       {surfaced.length > 0 && (

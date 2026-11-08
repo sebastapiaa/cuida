@@ -57,7 +57,8 @@ function describe(a) {
   const c = a.conversation_config || {};
   const p = c.agent?.prompt || {};
   console.log(`agent      ${a.name} (${a.agent_id})`);
-  console.log(`llm        ${p.llm}   temperature ${p.temperature}`);
+  console.log(`llm        ${p.llm}   temperature ${p.temperature}   max_tokens ${p.max_tokens}   thinking_budget ${p.thinking_budget ?? "default"}`);
+  console.log(`tts speed  streaming_latency ${c.tts?.optimize_streaming_latency}`);
   console.log(`tts        ${c.tts?.model_id}   voice ${c.tts?.voice_id}   expressive ${c.tts?.expressive_mode ?? "n/a"}`);
   console.log(`turn       eagerness ${c.turn?.turn_eagerness}   timeout ${c.turn?.turn_timeout}s`);
   console.log(`language   ${c.agent?.language}   presets ${JSON.stringify(Object.keys(c.language_presets || {}))}`);
@@ -153,7 +154,8 @@ const toolIds = tools.map((t) => state.tools[t.name]);
 /* ------------------------------------------------------------------ */
 const cur = current?.conversation_config || {};
 const curPrompt = cur.agent?.prompt || {};
-const LLM_CANDIDATES = [...new Set([process.env.AGENT_LLM, "gemini-2.5-flash", "gpt-4.1-mini", "gpt-4o-mini", curPrompt.llm].filter(Boolean))];
+// Fastest first. Measured on this agent: gemini-2.5-flash took 2.5-3.5s per generation (thinking on).
+const LLM_CANDIDATES = [...new Set([process.env.AGENT_LLM, "gemini-2.5-flash-lite", "gemini-2.0-flash", "gpt-4.1-nano", "gpt-4.1-mini", "gemini-2.5-flash", curPrompt.llm].filter(Boolean))];
 
 // Keep only the system tools we want (end_call, language_detection); drop the rest.
 const builtIn = {};
@@ -168,7 +170,7 @@ if (!presets.es) presets.es = { overrides: { agent: { language: "es" } } };
 const voiceId = process.env.ELEVENLABS_VOICE_ID || cur.tts?.voice_id;
 const TTS_CANDIDATES = ["eleven_flash_v2_5", "eleven_flash_v2"];
 function buildConfig(llm, ttsModel, opts = {}) {
-  const tts = { ...(cur.tts || {}), model_id: ttsModel, optimize_streaming_latency: 3 };
+  const tts = { ...(cur.tts || {}), model_id: ttsModel, optimize_streaming_latency: 4 };
   if (voiceId) tts.voice_id = voiceId;
   if (!opts.keepExpressive) {
     tts.expressive_mode = false;
@@ -185,7 +187,7 @@ function buildConfig(llm, ttsModel, opts = {}) {
     agent: {
       first_message: "Hi Rosa, it's cuida. How are you feeling today?",
       language: "en",
-      prompt: { prompt, llm, temperature: 0, tool_ids: toolIds, built_in_tools: builtIn },
+      prompt: { prompt, llm, temperature: 0, max_tokens: 160, tool_ids: toolIds, built_in_tools: builtIn, ...(opts.noThinking ? {} : { thinking_budget: 0, reasoning_effort: null }) },
     },
     tts,
     turn,
@@ -196,7 +198,7 @@ function buildConfig(llm, ttsModel, opts = {}) {
 
 // Try the fastest settings first; on a 422 read the message and relax one thing at a time.
 const plans = [];
-const relax = [{}, { keepExpressive: true }, { noEager: true }, { noPresets: true }, { keepExpressive: true, noEager: true, noPresets: true }];
+const relax = [{}, { noThinking: true }, { keepExpressive: true, noThinking: true }, { noEager: true, noThinking: true }, { noPresets: true, noThinking: true }, { keepExpressive: true, noEager: true, noPresets: true, noThinking: true }];
 for (const o of relax) for (const tts of TTS_CANDIDATES) for (const llm of LLM_CANDIDATES) plans.push({ llm, tts, opts: o });
 
 let result = null;
