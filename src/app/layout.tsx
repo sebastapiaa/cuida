@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import "@fontsource-variable/fraunces";
-import "@fontsource-variable/inter";
+import "@fontsource-variable/inter-tight";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "cuida · health records, answered out loud",
+  title: "cuida",
   description: "A voice agent that knows your parent's health records.",
 };
 
