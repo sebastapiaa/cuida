@@ -41,12 +41,31 @@ export function getSandbox(): Promise<Sandbox> {
   if (!g.__cuidaSandbox) {
     const daytona = new Daytona({ apiKey: process.env.DAYTONA_API_KEY });
     g.__cuidaSandbox = (async () => {
-      if (process.env.DAYTONA_SANDBOX_ID) {
-        const sb = await daytona.get(process.env.DAYTONA_SANDBOX_ID);
+      const ensureStarted = async (sb: Sandbox) => {
         if (sb.state !== "started") await sb.start();
         return sb;
+      };
+      if (process.env.DAYTONA_SANDBOX_ID) {
+        try {
+          return await ensureStarted(await daytona.get(process.env.DAYTONA_SANDBOX_ID));
+        } catch (e) {
+          console.log(`[daytona] DAYTONA_SANDBOX_ID not usable, looking for a cuida sandbox: ${String(e).slice(0, 80)}`);
+        }
       }
-      return daytona.create({ language: "python", autoStopInterval: 30, labels: { app: "cuida" } });
+      // Reuse the sandbox labeled app=cuida instead of creating one per server start
+      // (each new sandbox eats disk quota; the account hit the limit once).
+      const existing: Sandbox[] = [];
+      try {
+        for await (const s of daytona.list({ labels: { app: "cuida" } })) existing.push(s);
+      } catch (e) {
+        console.log(`[daytona] list failed: ${String(e).slice(0, 80)}`);
+      }
+      const keep = existing.find((s) => s.state === "started") ?? existing[0];
+      if (keep) {
+        if (existing.length > 1) console.log(`[daytona] ${existing.length} cuida sandboxes exist; reusing ${keep.id}. Archive the others in the Daytona dashboard to free quota.`);
+        return ensureStarted(keep);
+      }
+      return daytona.create({ language: "python", autoStopInterval: 0, labels: { app: "cuida" } });
     })().catch((e) => {
       g.__cuidaSandbox = undefined;
       throw e;
