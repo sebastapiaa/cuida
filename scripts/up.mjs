@@ -108,7 +108,8 @@ function startTunnel() {
     const [cmd, pre] = cloudflaredCmd();
     log("tunnel", `starting ${cmd === "npx" ? "npx cloudflared" : cmd} quick tunnel to ${LOCAL}`);
     tunnelUrl = "";
-    tunnel = spawn(cmd, [...pre, "tunnel", "--url", LOCAL, "--no-autoupdate"]);
+    // http2 transport: QUIC timed out ("no recent network activity") on restrictive networks
+    tunnel = spawn(cmd, [...pre, "tunnel", "--url", LOCAL, "--no-autoupdate", "--protocol", "http2"]);
     const tn = tunnel;
     let resolved = false;
     const finish = (url) => {
