@@ -138,12 +138,12 @@ async function waitTunnelReachable(url) {
   // the quick tunnel needs a few seconds after printing the URL before edge routes it
   const t = Date.now();
   while (Date.now() - t < 60_000) {
-    const r = await http(`${url}/api/agent/feed`, { timeout: 8000 });
+    const r = await http(`${url}/api/agent/feed`, { timeout: 6000 });
     if (r.status === 200) {
       log("tunnel", `reachable through ${url} (${r.ms}ms)`);
       return true;
     }
-    await sleep(1500);
+    await sleep(1000);
   }
   log("tunnel", `not reachable through ${url} after 60s`);
   return false;
@@ -205,6 +205,13 @@ async function health() {
   if (t.status === 200 && tunnel) {
     tunnelFails = 0;
     if (tunnelUrl !== syncedUrl) await syncAgent(tunnelUrl);
+    return;
+  }
+  // A DNS or deadline error on this laptop does not mean the tunnel is down for ElevenLabs.
+  // Only count real tunnel failures (cloudflared gone, or Cloudflare answering 5xx) toward a restart.
+  const dnsish = t.status === 0 && /ENOTFOUND|EAI_AGAIN|deadline|timeout/.test(String(t.error));
+  if (dnsish && tunnel) {
+    log("health", `tunnel check inconclusive (${t.error}, local DNS/network); cloudflared still running, not restarting`);
     return;
   }
   tunnelFails++;
